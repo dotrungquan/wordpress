@@ -174,6 +174,7 @@ echo ""
 VERSIONS=$(curl -s https://api.wordpress.org/core/version-check/1.7/ | \
     grep -oP '"version":"[0-9]+\.[0-9]+(\.[0-9]+)?"' | \
     grep -oP '[0-9]+\.[0-9]+(\.[0-9]+)?' | \
+    awk '!seen[$0]++' | \
     head -n 10)
 
 if [ -z "$VERSIONS" ]; then
