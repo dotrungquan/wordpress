@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script thay thế WordPress Core
-# Tác giả: Claude
+# Tác giả: DOTRUNGQUAN.INFO
 # Mô tả: Tải và thay thế WordPress core (no-content) với tính năng backup
 
 set -e
