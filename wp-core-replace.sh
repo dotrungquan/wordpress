@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script thay thế WordPress Core
-# Tác giả: DOTRUNGQUAN.INFO
+# Tác giả: Claude
 # Mô tả: Tải và thay thế WordPress core (no-content) với tính năng backup
 
 set -e
@@ -269,9 +269,22 @@ fi
 
 print_separator
 
+# Tạo thư mục backup nếu chưa có
+BACKUP_DIR="core_backup"
+echo ""
+if [ ! -d "$BACKUP_DIR" ]; then
+    print_info "Đang tạo thư mục backup..."
+    mkdir -p "$BACKUP_DIR"
+    chmod 700 "$BACKUP_DIR"
+    print_success "Đã tạo thư mục: ${BOLD}${BACKUP_DIR}/${NC} (permission: ${BOLD}700${NC})"
+else
+    print_info "Thư mục backup đã tồn tại: ${BOLD}${BACKUP_DIR}/${NC}"
+    chmod 700 "$BACKUP_DIR"  # Đảm bảo permission đúng
+fi
+echo ""
+
 # Backup database (chỉ khi có WP-CLI)
 if [ "$HAS_WPCLI" = true ]; then
-    echo ""
     echo -e "${BOLD}[4/6]${NC} Backup Database & WordPress Core..."
     echo ""
     
@@ -280,23 +293,24 @@ if [ "$HAS_WPCLI" = true ]; then
     echo -e "${CYAN}╠════════════════════════════════════════════════════════════╣${NC}"
     echo -e "${CYAN}║${NC}  Bạn có muốn backup database trước khi cập nhật?          ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}  (Khuyến nghị: Yes)                                        ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}  Lưu tại: ${BOLD}${BACKUP_DIR}/${NC}                                     ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -ne "${YELLOW}❯${NC} Backup Database? (yes/no) [${GREEN}yes${NC}]: "
     read -r db_backup_choice
     
     if [ -z "$db_backup_choice" ] || [ "$db_backup_choice" == "yes" ]; then
-        DB_BACKUP_FILE="database-backup-$(date +%Y%m%d-%H%M%S).sql"
+        DB_BACKUP_FILE="${BACKUP_DIR}/database-backup-$(date +%Y%m%d-%H%M%S).sql"
         echo ""
-        print_info "Đang backup database..."
+        print_info "Đang backup database vào ${BACKUP_DIR}/..."
         
         if wp db export "$DB_BACKUP_FILE" --allow-root 2>/dev/null; then
             # Set permission 600
             chmod 600 "$DB_BACKUP_FILE"
             
             DB_SIZE=$(du -h "$DB_BACKUP_FILE" | cut -f1)
-            print_success "Backup database thành công: ${BOLD}${DB_BACKUP_FILE}${NC} (${DB_SIZE})"
-            print_info "Đã set permission: ${BOLD}600${NC} (chỉ owner có quyền đọc/ghi)"
+            print_success "Backup database: ${BOLD}${DB_BACKUP_FILE}${NC} (${DB_SIZE})"
+            print_info "Permission file: ${BOLD}600${NC}"
         else
             print_error "Không thể backup database"
             echo -ne "${YELLOW}❯${NC} Tiếp tục mà không backup database? (yes/no): "
@@ -311,7 +325,6 @@ if [ "$HAS_WPCLI" = true ]; then
     fi
     echo ""
 else
-    echo ""
     echo -e "${BOLD}[4/6]${NC} Backup WordPress Core..."
     echo ""
 fi
@@ -322,19 +335,21 @@ echo -e "${CYAN}║${NC}  ${YELLOW}⚠  Backup WordPress Core${NC}              
 echo -e "${CYAN}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${CYAN}║${NC}  Bạn có muốn backup core hiện tại trước khi thay thế?      ${CYAN}║${NC}"
 echo -e "${CYAN}║${NC}  (Backup sẽ loại trừ wp-content)                           ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  Lưu tại: ${BOLD}${BACKUP_DIR}/${NC}                                     ${CYAN}║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -ne "${YELLOW}❯${NC} Backup Core? (yes/no) [${GREEN}yes${NC}]: "
 read -r backup_choice
 
 if [ -z "$backup_choice" ] || [ "$backup_choice" == "yes" ]; then
-    BACKUP_FILE="wordpress-core-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+    BACKUP_FILE="${BACKUP_DIR}/wordpress-core-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
     echo ""
-    print_info "Đang tạo backup core..."
+    print_info "Đang backup core vào ${BACKUP_DIR}/..."
     
-    # Tạo danh sách file cần backup (loại trừ wp-content)
+    # Tạo danh sách file cần backup (loại trừ wp-content và core_backup)
     tar -czf "$BACKUP_FILE" \
         --exclude='wp-content' \
+        --exclude='core_backup' \
         --exclude='*.log' \
         --exclude='.git' \
         --exclude='node_modules' \
@@ -361,8 +376,8 @@ if [ -z "$backup_choice" ] || [ "$backup_choice" == "yes" ]; then
         
         BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
         printf "\r"
-        print_success "Backup core thành công: ${BOLD}${BACKUP_FILE}${NC} (${BACKUP_SIZE})"
-        print_info "Đã set permission: ${BOLD}600${NC} (chỉ owner có quyền đọc/ghi)"
+        print_success "Backup core: ${BOLD}${BACKUP_FILE}${NC} (${BACKUP_SIZE})"
+        print_info "Permission file: ${BOLD}600${NC}"
     else
         print_error "Không thể tạo backup"
         exit 1
@@ -492,17 +507,24 @@ echo -e "${GREEN}║${NC}  Phiên bản cũ: ${RED}${CURRENT_VERSION}${NC}      
 echo -e "${GREEN}║${NC}  Phiên bản mới: ${BOLD}${GREEN}${NEW_VERSION}${NC}                                      ${GREEN}║${NC}"
 
 if [ -n "$DB_BACKUP_FILE" ] && [ -f "$DB_BACKUP_FILE" ]; then
+    DB_FILENAME=$(basename "$DB_BACKUP_FILE")
     echo -e "${GREEN}║${NC}                                                            ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}  ${CYAN}File backup database:${NC}                                  ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}    ${DB_BACKUP_FILE}                ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}    ${YELLOW}Permission: 600${NC} (bảo mật)                             ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}  ${CYAN}📁 Backup Database:${NC}                                     ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}     ${BACKUP_DIR}/${DB_FILENAME}      ${GREEN}║${NC}"
 fi
 
 if [ -f "$BACKUP_FILE" ]; then
+    CORE_FILENAME=$(basename "$BACKUP_FILE")
     echo -e "${GREEN}║${NC}                                                            ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}  ${CYAN}File backup core:${NC}                                      ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}    ${BACKUP_FILE}            ${GREEN}║${NC}"
-    echo -e "${GREEN}║${NC}    ${YELLOW}Permission: 600${NC} (bảo mật)                             ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}  ${CYAN}📁 Backup Core:${NC}                                         ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}     ${BACKUP_DIR}/${CORE_FILENAME} ${GREEN}║${NC}"
+fi
+
+if [ -d "$BACKUP_DIR" ] && { [ -n "$DB_BACKUP_FILE" ] || [ -f "$BACKUP_FILE" ]; }; then
+    echo -e "${GREEN}║${NC}                                                            ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}  ${YELLOW}🔒 Permissions:${NC}                                         ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}     Thư mục ${BACKUP_DIR}: ${BOLD}700${NC}                            ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}     File backup: ${BOLD}600${NC}                                     ${GREEN}║${NC}"
 fi
 
 echo -e "${GREEN}║${NC}                                                            ${GREEN}║${NC}"
