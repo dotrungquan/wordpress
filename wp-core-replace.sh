@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script thay thế WordPress Core
-# Tác giả: Claude
+# Tác giả: DOTRUNGQUAN.INFO
 # Mô tả: Tải và thay thế WordPress core (no-content) với tính năng backup
 
 set -e
@@ -190,20 +190,47 @@ while IFS= read -r version; do
     ((counter++))
 done <<< "$VERSIONS"
 
+echo -e "${CYAN}╠════════════════════════════════════════════════════════════╣${NC}"
+echo -e "${CYAN}║${NC}  ${CYAN}${counter}.${NC} ${YELLOW}Nhập phiên bản tùy chỉnh${NC}                             ${CYAN}║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Nhập phiên bản muốn cài
-echo -e "${YELLOW}❯${NC} Chọn phiên bản (nhập số thứ tự hoặc phiên bản):"
+echo -e "${YELLOW}❯${NC} Chọn phiên bản (nhập số thứ tự 1-${counter}):"
 echo -ne "${YELLOW}❯${NC} Mặc định [${GREEN}${version_array[0]}${NC}]: "
 read -r user_input
 
 # Xử lý input
+CUSTOM_OPTION=$counter
+
 if [ -z "$user_input" ]; then
     SELECTED_VERSION="${version_array[0]}"
-elif [[ "$user_input" =~ ^[0-9]+$ ]] && [ "$user_input" -ge 1 ] && [ "$user_input" -le "${#version_array[@]}" ]; then
-    SELECTED_VERSION="${version_array[$((user_input-1))]}"
+elif [[ "$user_input" =~ ^[0-9]+$ ]]; then
+    # Nếu chọn số thứ tự
+    if [ "$user_input" -eq "$CUSTOM_OPTION" ]; then
+        # Chọn tùy chọn nhập tùy chỉnh
+        echo ""
+        echo -e "${YELLOW}❯${NC} Nhập phiên bản WordPress (VD: 6.9.4, 6.8.5):"
+        echo -ne "${YELLOW}❯${NC} Phiên bản: "
+        read -r custom_version
+        
+        if [[ -z "$custom_version" ]]; then
+            print_error "Bạn chưa nhập phiên bản"
+            exit 1
+        elif [[ ! "$custom_version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            print_error "Định dạng phiên bản không hợp lệ. VD: 6.9.4"
+            exit 1
+        fi
+        
+        SELECTED_VERSION="$custom_version"
+    elif [ "$user_input" -ge 1 ] && [ "$user_input" -lt "$CUSTOM_OPTION" ]; then
+        SELECTED_VERSION="${version_array[$((user_input-1))]}"
+    else
+        print_error "Lựa chọn không hợp lệ"
+        exit 1
+    fi
 elif [[ "$user_input" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    # Nhập trực tiếp phiên bản
     SELECTED_VERSION="$user_input"
 else
     print_error "Lựa chọn không hợp lệ"
